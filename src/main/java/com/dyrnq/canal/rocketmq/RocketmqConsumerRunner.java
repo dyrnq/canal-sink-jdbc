@@ -1,10 +1,12 @@
 package com.dyrnq.canal.rocketmq;
 
+import cn.hutool.core.util.ReUtil;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.github.wz2cool.canal.utils.SqlUtils;
+import com.github.wz2cool.canal.utils.generator.AbstractSqlTemplateGenerator;
 import com.github.wz2cool.canal.utils.generator.MysqlSqlTemplateGenerator;
 import com.github.wz2cool.canal.utils.generator.PostgresqlSqlTemplateGenerator;
 import com.github.wz2cool.canal.utils.model.CanalRowChange;
@@ -25,6 +27,8 @@ import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
+import java.sql.Connection;
+import java.sql.DatabaseMetaData;
 import java.util.List;
 import java.util.Map;
 
@@ -47,6 +51,18 @@ public class RocketmqConsumerRunner implements ApplicationRunner {
     private String consumerSubscribe;
 
 
+    protected String getDatabaseType() {
+        String dbType = null;
+        try (Connection connection = jdbcTemplate.getDataSource().getConnection()) {
+            DatabaseMetaData metaData = connection.getMetaData();
+            dbType = metaData.getDatabaseProductName();
+        } catch (Exception e) {
+            log.error(e.getMessage(), e);
+        }
+        return dbType;
+    }
+
+
     @Override
     public void run(ApplicationArguments args) throws Exception {
         DefaultMQPushConsumer consumer = new DefaultMQPushConsumer(consumerGroup);
@@ -56,6 +72,20 @@ public class RocketmqConsumerRunner implements ApplicationRunner {
 
         consumer.setConsumeFromWhere(ConsumeFromWhere.CONSUME_FROM_FIRST_OFFSET);
         consumer.subscribe(consumerSubscribe, "*");
+        String databaseType = getDatabaseType();
+
+        AbstractSqlTemplateGenerator sqlTemplateGenerator;
+
+        if (ReUtil.isMatch("(?i)my(sql)?", databaseType)) {
+            sqlTemplateGenerator = mysqlSqlTemplateGenerator;
+        } else if (ReUtil.isMatch("(?i)postgres(ql)?|pg(sql)?", databaseType)) {
+            sqlTemplateGenerator = postgresqlSqlTemplateGenerator;
+        } else {
+            throw new IllegalAccessException("not support" + databaseType);
+        }
+
+        log.info("sqlTemplateGenerator use {}.", sqlTemplateGenerator.getClass().getCanonicalName());
+
 
         consumer.registerMessageListener((MessageListenerConcurrently) (msgs, context) -> {
             for (MessageExt msg : msgs) {
@@ -86,7 +116,7 @@ public class RocketmqConsumerRunner implements ApplicationRunner {
                     } else {
 
                         final CanalRowChange rowChange = SqlUtils.getRowChange(flatMessage);
-                        final List<SqlTemplate> sqlTemplates = mysqlSqlTemplateGenerator.listDMLSqlTemplates(rowChange);
+                        final List<SqlTemplate> sqlTemplates = sqlTemplateGenerator.listDMLSqlTemplates(rowChange);
 
                         if (sqlTemplates != null) {
                             for (SqlTemplate sqlTemplate : sqlTemplates) {
@@ -106,7 +136,6 @@ public class RocketmqConsumerRunner implements ApplicationRunner {
 
                 } catch (DataAccessException e) {
                     if (e.getCause() instanceof java.sql.SQLSyntaxErrorException) {
-                        e.printStackTrace();
 
                         String errorMessage = e.getMessage();
                         String regex = "Table +'([^']+)' already exists";

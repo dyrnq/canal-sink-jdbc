@@ -1,5 +1,6 @@
 package com.dyrnq.canal;
 
+import com.github.wz2cool.canal.utils.generator.MssqlSqlTemplateGenerator;
 import com.github.wz2cool.canal.utils.generator.MysqlSqlTemplateGenerator;
 import com.github.wz2cool.canal.utils.generator.PostgresqlSqlTemplateGenerator;
 import lombok.extern.slf4j.Slf4j;
@@ -22,5 +23,10 @@ public class CanalSinkJdbcApplication {
     @Bean
     public PostgresqlSqlTemplateGenerator getPostgresqlSqlTemplateGenerator() {
         return new PostgresqlSqlTemplateGenerator();
+    }
+
+    @Bean
+    public MssqlSqlTemplateGenerator getMssqlSqlTemplateGenerator() {
+        return new MssqlSqlTemplateGenerator();
     }
 }
