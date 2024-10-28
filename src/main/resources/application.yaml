@@ -7,7 +7,7 @@ spring:
   lifecycle:
     timeout-per-shutdown-phase: "20s"
   datasource:
-    url: jdbc:mysql://replicadb-5:3306/mytest2?serverTimezone=Asia/Shanghai&useUnicode=true&characterEncoding=utf8&useSSL=false&allowPublicKeyRetrieval=true
+    url: jdbc:mysql://replica-db5:3306/mytest2?serverTimezone=Asia/Shanghai&useUnicode=true&characterEncoding=utf8&useSSL=false&allowPublicKeyRetrieval=true
     username: root
     password: 666666
     driver-class-name: com.mysql.cj.jdbc.Driver
