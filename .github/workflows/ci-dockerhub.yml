@@ -1,0 +1,93 @@
+name: CI to Docker Hub
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    -
+      name: Checkout
+      uses: actions/checkout@v4 # v4
+
+    -
+      name: Set up JDK 21
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'temurin'
+        java-version: '21'
+
+    -
+      name: Java Environment
+      run: env | grep '^JAVA'
+
+    -
+      name: Cache Maven packages
+      uses: actions/cache@v4
+      with:
+        path: ~/.m2
+        key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+        restore-keys: ${{ runner.os }}-m2
+
+    -
+      name: Build with Maven
+      run: mvn clean package -Dmaven.test.skip=true
+
+    -
+      name: Set up QEMU
+      id: qemu
+      uses: docker/setup-qemu-action@v3
+    -
+      name: Set up Docker Buildx
+      id: buildx
+      uses: docker/setup-buildx-action@v3
+    -
+      name: Inspect builder
+      run: |
+        echo "Name:      ${{ steps.buildx.outputs.name }}"
+        echo "Endpoint:  ${{ steps.buildx.outputs.endpoint }}"
+        echo "Status:    ${{ steps.buildx.outputs.status }}"
+        echo "Flags:     ${{ steps.buildx.outputs.flags }}"
+        echo "Platforms: ${{ steps.buildx.outputs.platforms }}"
+
+    - name: Build dockerfile (with no push)
+      run: |
+        
+        for line in  "eclipse-temurin:21.0.4_7-jdk-noble" "eclipse-temurin:21.0.4_7-jre-noble"; do
+          tag=""
+          if grep -q jre <<< "${line}"; then   tag="${tag} --tag ${{ secrets.DOCKER_USERNAME }}/canal-sink-jdbc:jre-latest"; fi;
+          if grep -q jdk <<< "${line}"; then   tag="${tag} --tag ${{ secrets.DOCKER_USERNAME }}/canal-sink-jdbc:jdk-latest"; fi;
+          if grep -q jre <<< "${line}"; then   tag="${tag} --tag ${{ secrets.DOCKER_USERNAME }}/canal-sink-jdbc:latest"; fi;
+          echo $tag;
+          docker buildx build \
+          --build-arg BASE_IMAGE="${line}" \
+          --platform linux/amd64,linux/arm64/v8,linux/ppc64le,linux/s390x \
+          --output "type=image,push=false" \
+          --file ./docker/Dockerfile . ${tag}
+        done
+
+    -
+      name: Login to DockerHub
+      uses: docker/login-action@v3
+      with:
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
+
+    - name: Build dockerfile (with push)
+      run: |
+        for line in  "eclipse-temurin:21.0.4_7-jdk-noble" "eclipse-temurin:21.0.4_7-jre-noble"; do
+          tag=""
+          if grep -q jre <<< "${line}"; then   tag="${tag} --tag ${{ secrets.DOCKER_USERNAME }}/canal-sink-jdbc:jre-latest"; fi;
+          if grep -q jdk <<< "${line}"; then   tag="${tag} --tag ${{ secrets.DOCKER_USERNAME }}/canal-sink-jdbc:jdk-latest"; fi;
+          if grep -q jre <<< "${line}"; then   tag="${tag} --tag ${{ secrets.DOCKER_USERNAME }}/canal-sink-jdbc:latest"; fi;
+          echo $tag;
+          docker buildx build \
+          --build-arg BASE_IMAGE="${line}" \
+          --platform linux/amd64,linux/arm64/v8,linux/ppc64le,linux/s390x \
+          --output "type=image,push=true" \
+          --file ./docker/Dockerfile . ${tag}
+        done
+
