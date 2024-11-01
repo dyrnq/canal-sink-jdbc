@@ -78,8 +78,10 @@ public class RocketmqConsumerRunner implements ApplicationRunner {
 
         if (ReUtil.isMatch("(?i)my(sql)?", databaseType)) {
             sqlTemplateGenerator = mysqlSqlTemplateGenerator;
+            sqlTemplateGenerator.setTimestampConverter(new CustomTimestampConverter());
         } else if (ReUtil.isMatch("(?i)postgres(ql)?|pg(sql)?", databaseType)) {
             sqlTemplateGenerator = postgresqlSqlTemplateGenerator;
+            sqlTemplateGenerator.setTimestampConverter(new CustomTimestampConverter());
         } else {
             throw new IllegalAccessException("not support" + databaseType);
         }
