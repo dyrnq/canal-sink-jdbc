@@ -88,7 +88,8 @@ public class RocketmqConsumerRunner implements ApplicationRunner {
 
         log.info("sqlTemplateGenerator use {}.", sqlTemplateGenerator.getClass().getCanonicalName());
 
-
+        ObjectMapper objectMapper = new ObjectMapper();
+        objectMapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
         consumer.registerMessageListener((MessageListenerConcurrently) (msgs, context) -> {
             for (MessageExt msg : msgs) {
                 String messageBody = new String(msg.getBody());
@@ -99,8 +100,6 @@ public class RocketmqConsumerRunner implements ApplicationRunner {
                 boolean isCompressed = (sysFlag & 0x1) != 0;
 
                 try {
-                    ObjectMapper objectMapper = new ObjectMapper();
-                    objectMapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 
 
                     final FlatMessage flatMessage = objectMapper.readValue(messageBody, FlatMessage.class);
